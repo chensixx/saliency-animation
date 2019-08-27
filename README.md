@@ -8,9 +8,6 @@ Visualization animation are often used show time elapsed data. But the speed of 
 
 ## Set up
 
-If you just want to see the result: download al files. In terminal, go to "web/" folder, type in "python -m SimpleHTTPServer 1337". Then in your browser type in "http://localhost:1337/index.html". Done
-
-To start from scratch:
 Step 1: set up the saliency model with instructions here: https://github.com/marcellacornia/sam. Fulfill all requirements.
 Good luck!
 Make sure it works.
@@ -22,11 +19,11 @@ and uncomment line 431: .ease("linear") , then comment line 430, save;
 Step 3: In terminal, go to "web/" folder, type in "python -m SimpleHTTPServer 1337". Then in your browser type in "http://localhost:1337/index.html". When you run this, it will start downloading 137 frames of the animation.
 Go to your download folder and copy these frames to a folder with any name you like, mine is called "screenshots/". Move the folder to the saliency model folder "saliency/"
 
-Step 4: In terminal, "cd saliency" run "python main.py test screenshots/" 
+Step 4: In terminal, "cd saliency" run "python main.py test screenshots/". 
 In about 20 minutes, all the saliency maps will be in folder "predictions/"
 Then run "python img.py" now you will get an array of numbers. they are motion magnitude of the change between every frame. If you want difference between every n frames just change line 20 into range(n,size,n) and line 21 into [x-5] line 22 to [x]
 
-I already have all the motion magnitude array in index.html from line 221.
+	I already have all the motion magnitude arrays in index.html from line 221.
 
 Step 5: Now comment line 470 and 431, uncomment line 430, save; refresh your page on browser now it will run in the custom speed.
 
