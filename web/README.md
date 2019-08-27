@@ -1,0 +1,3 @@
+This is a recreation in D3 of [Gapminder’s Wealth & Health of Nations](http://gapminder.org/world/), made famous by Hans Rosling’s memorable 2006 TED talk. It shows the dynamic fluctuation in per-capita income (x), life expectancy (y) and population (radius) of 180 nations over the last 209 years. Nations are colored by geographic region; mouseover to read their names. 
+
+Original credit to [Mike Bostock](https://bost.ocks.org/mike/nations/). I added the tooltip labels.

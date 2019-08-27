@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<title>The Wealth & Health of Nations</title>
+<style>
+#chart {
+    font-family: "Helvetica Neue";
+  	margin-left: -10px;
+    height:100%;
+    width:80%;
+    margin-right:0;
+display: inline-block;
+
+}
+#choice{
+  display: inline-block;
+  margin-left:70px;
+}
+#vis{
+  display: inline-block;
+}
+.dot { stroke: #000; }
+
+.axis path, .axis line {
+  	fill: none;
+  	stroke: #000;
+  	shape-rendering: crispEdges;
+}
+
+.year.label {
+  	font: 500 196px "Helvetica Neue";
+  	fill: #ddd;
+}
+
+.overlay {
+  	fill: none;
+  	pointer-events: all;
+  	cursor: ew-resize;
+}
+  .d3-tip {
+  font-family: "Helvetica Neue";
+  line-height: 1;
+  font-weight: bold;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Creates a small triangle extender for the tooltip */
+.d3-tip:after {
+  box-sizing: border-box;
+  display: inline;
+  font-size: 10px;
+  width: 100%;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.8);
+  position: absolute;
+  pointer-events: none;
+}
+
+/* Northward tooltips */
+.d3-tip.n:after {
+  content: "\25BC";
+  margin: -1px 0 0 0;
+  top: 100%;
+  left: 0;
+  text-align: center;
+}
+
+/* Eastward tooltips */
+.d3-tip.e:after {
+  content: "\25C0";
+  margin: -4px 0 0 0;
+  top: 50%;
+  left: -8px;
+}
+
+/* Southward tooltips */
+.d3-tip.s:after {
+  content: "\25B2";
+  margin: 0 0 1px 0;
+  top: -8px;
+  left: 0;
+  text-align: center;
+}
+
+/* Westward tooltips */
+.d3-tip.w:after {
+  content: "\25B6";
+  margin: -4px 0 0 -1px;
+  top: 50%;
+  left: 100%;
+}
+</style>
+
+<div id="chart"></div>
+<div id = "choice">
+ # of frames(0-5): <input type="text" name="speed" value="1" id="custom_frame"> enter "0" for linear speed<br>
+<button id="rerun">Submit</button>
+</div>
+
+<div id="plotly"></div>
+
+<script src="http://d3js.org/d3.v3.js"></script>
+<script src="savepng.js"></script>
+<script src="http://cdn.jsdelivr.net/mojs/latest/mo.min.js"></script>
+<script src="CustomEase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/2.1.3/TweenMax.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-tip/0.6.3/d3-tip.min.js"></script>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>  
+
+  <script>
+// Chart dimensions.
+var margin = { top: 19.5, right: 60, bottom: 30, left: 39.5 },
+    width = 960 - margin.right,
+    height = 500 - margin.top - margin.bottom;
+
+// Various scales. These domains make assumptions of data, naturally.
+var xScale = d3.scale.log().domain([300, 1e5]).range([0, width]),
+    yScale = d3.scale.linear().domain([10, 85]).range([height, 0]),
+    radiusScale = d3.scale.sqrt().domain([0, 5e8]).range([0, 40]),
+    colorScale = d3.scale.category10();
+
+// The x & y axes.
+var xAxis = d3.svg.axis().scale(xScale).orient("bottom").ticks(12, d3.format(",d"));
+var yAxis = d3.svg.axis().scale(yScale).orient("left");
+
+// Create the SVG container and set the origin.
+var svg = d3.select("#chart").append("svg")
+    .attr("id","vis")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+  .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+// Add the x-axis.
+svg.append("g")
+    .attr("class", "x axis")
+    .attr("transform", "translate(0," + height + ")")
+    .call(xAxis);
+
+// Add the y-axis.
+svg.append("g")
+    .attr("class", "y axis")
+    .call(yAxis);
+
+// Add an x-axis label.
+svg.append("text")
+    .attr("class", "x label")
+    .attr("text-anchor", "end")
+    .attr("x", width)
+    .attr("y", height - 6)
+    .text("income per capita, inflation-adjusted (dollars)");
+
+// Add a y-axis label.
+svg.append("text")
+    .attr("class", "y label")
+    .attr("text-anchor", "end")
+    .attr("y", 6)
+    .attr("dy", ".75em")
+    .attr("transform", "rotate(-90)")
+    .text("life expectancy (years)");
+
+// Add the year label; the value is set on transition.
+var label = svg.append("text")
+    .attr("class", "year label")
+    .attr("text-anchor", "end")
+    .attr("y", height - 24)
+    .attr("x", width)
+    .text(1800);
+ var format = d3.format(".2s");
+var tip = d3.tip()
+  .attr('class', 'd3-tip')
+  .direction('s')
+  .html(function(d) {
+    return "<p><strong>" + d.name + "</strong></p><p><strong>Population: </strong>" + format(d.population) + "</p>";
+  })
+// Various accessors that specify the four dimensions of data to visualize.
+function x(d) { return d.income; }
+function y(d) { return d.lifeExpectancy; }
+function radius(d) { return d.population; }
+function color(d) { return d.region; }
+function key(d) { return d.name; }
+
+// Load the data.
+
+d3.json("nations.json", function(nations) {
+  	// A bisector since many nation's data is sparsely-defined.
+  	var bisect = d3.bisector(function(d) { return d[0]; });
+
+  	// Add a dot per nation. Initialize the data at 1800, and set the colors.
+  	var dot = svg.append("g")
+    		.call(tip)
+    		.attr("class", "dots")
+    	.selectAll(".dot")
+    		.data(interpolateData(1800))
+    	.enter().append("circle")
+    		.on('mouseover', tip.show)
+     		.on('mouseout', tip.hide)
+    		.attr("class", function (d) { return "dot " + d.name; })
+      	.style("fill", function(d) { return colorScale(color(d)); })
+      	.call(position)
+      	.sort(order);
+  
+  	// Add an overlay for the year label.
+  	 var box = label.node().getBBox();
+  
+  	var overlay = svg.append("rect")
+    		.attr("class", "overlay")
+    		.attr("x", box.x)
+    		.attr("y", box.y)
+    		.attr("width", box.width)
+    		.attr("height", box.height)
+    		.on("mouseover", enableInteraction);
+    
+
+    //nations.json original
+    var mmarr1= [32, 27, 44, 11, 12, 28, 6, 39, 15, 35, 0, 26, 23, 7, 34, 35, 12, 33, 17, 8, 33, 3, 42, 7, 30, 35, 27, 12, 40, 17, 43, 17, 5, 19, 12, 19, 2, 36, 23, 30, 10, 22, 30, 26, 33, 13, 34, 20, 31, 11, 7, 29, 11, 28, 6, 12, 32, 17, 19, 16, 24, 36, 21, 2, 49, 3, 38, 19, 15, 43, 9, 19, 18, 36, 13, 20, 12, 34, 41, 6, 16, 30, 18, 22, 50, 15, 27, 37, 38, 36, 30, 55, 14, 45, 39, 10, 42, 26, 39, 5, 23, 36, 57, 9, 30, 39, 26, 43, 42, 4, 21, 11, 8, 56, 26, 3, 49, 51, 61, 28, 46, 7, 4, 25, 28, 6, 6, 26, 45, 13, 35, 50, 51, 19, 27, 16]
+
+     var mmarr2=[37, 42, 19, 35, 28, 9, 10, 40, 28, 12, 12, 38, 38, 14, 35, 41, 7, 13, 10, 31, 10, 33, 32, 32, 18, 27, 18, 7, 20, 15, 29, 8, 28, 32, 37, 11, 38, 14, 15, 17, 26, 19, 47, 33, 40, 49, 31, 28, 33, 21, 34, 34, 40, 40, 9, 15, 18, 11, 59, 50, 36, 6, 17, 13, 30, 53, 37, 23]
+     var mmarr3=[46, 16, 30, 17, 28, 37, 17, 15, 37, 25, 12, 12, 12, 15, 39, 32, 14, 27, 15, 9, 30, 5, 22, 25, 21, 14, 15, 28, 40, 46, 36, 39, 44, 24, 35, 43, 9, 13, 24, 58, 19, 19, 27, 45, 37]
+     var mmarr4=[45, 32, 17, 35, 11, 33, 24, 44, 3, 19, 17, 34, 24, 9, 16, 16, 32, 20, 18, 15, 28, 44, 57, 30, 25, 36, 42, 9, 17, 60, 18, 16, 51]
+     var mmarr5=[40, 41, 9, 21, 36, 35, 8, 15, 25, 29, 14, 15, 26, 25, 11, 13, 39, 36, 46, 18, 37, 32, 17, 46, 20, 17, 56]
+
+    //test1
+     //var mmarr =[1, 5, 2, 1, 2, 1, 3, 0, 3, 0, 3, 2, 5, 5, 0, 4, 0, 4, 5, 2, 0, 6, 2, 7, 3, 5, 3, 3, 2, 7, 3, 3, 1, 3, 3, 4, 3, 5, 1, 3, 5, 1, 3, 5, 5, 1, 1, 4, 1, 0, 1, 6, 5, 2, 3, 5, 3, 1, 5, 0, 2, 3, 1, 2, 4, 2, 5, 2, 5, 2, 3, 3, 1, 5, 2, 1, 5, 2, 2, 3, 3, 3, 1, 4, 5, 0, 3, 4, 3, 0, 3, 0, 4, 4, 2, 4, 2, 2, 5, 1]
+
+    //test2
+     // var mmarr = [5, 2, 12, 12, 1, 2, 10, 2, 6, 11, 11, 6, 5, 6, 6, 4, 2, 8, 2, 10, 3, 4, 9, 2, 10, 5, 2, 4, 2, 10, 7, 5, 5, 1, 3, 6, 3, 2, 8, 2, 8, 9, 3, 10, 2, 9, 5, 2, 8, 3, 6, 8, 3, 10, 1, 5, 11, 5, 9, 5, 4, 8, 8, 5, 5, 6, 8, 4, 5, 8, 3, 10, 4, 5, 2, 8, 9, 3, 8, 2, 8, 8, 2, 10, 10, 2, 4, 9, 3, 4, 7, 6, 5, 4, 10, 2, 7, 4, 3,0]
+     
+     //test3
+     //var mmarr= [0, 5, 2, 4, 8, 5, 5, 5, 5, 7, 3, 7, 6, 6, 7, 2, 7, 7, 4, 4, 8, 2, 9, 6, 8, 5, 6, 8, 7, 6, 7, 4, 4, 9, 4, 5, 6, 4, 5, 3, 6, 5, 6, 3, 9, 3, 8, 2, 5, 3, 8, 6, 5, 3, 2, 7, 6, 4, 9, 9, 1, 6, 5, 5, 4, 4, 4, 2, 10, 3, 8, 8, 5, 8, 2, 4, 7, 5, 6, 13, 5, 6, 5, 8, 6, 5, 6, 6, 4, 3, 4, 3, 8, 4, 7, 3, 5, 8, 8,0]
+
+     //test4
+     //var mmarr=[7, 4, 3, 4, 3, 8, 5, 4, 7, 9, 6, 6, 6, 5, 4, 8, 4, 5, 7, 5, 4, 3, 2, 4, 2, 10, 5, 1, 7, 3, 8, 4, 6, 1, 2, 7, 7, 2, 4, 4, 7, 5, 5, 4, 9, 5, 7, 4, 3, 6, 4, 4, 9, 4, 4, 0, 9, 1, 0, 8, 2, 9, 4, 2, 10, 6, 6, 4, 1, 9, 5, 4, 2, 0, 4, 10, 0, 7, 5, 4, 6, 6, 2, 4, 2, 0, 10, 6, 4, 9, 5, 4, 8, 5, 10, 4, 5, 3, 9,0]
+
+
+     //var mmarr=[22, 80, 30, 14, 30, 26, 45, 0, 53, 0, 50, 35, 79, 82, 0, 55, 12, 64, 73, 31, 13, 88, 30, 98, 50, 74, 49, 49, 32, 100, 53, 46, 26, 43, 50, 61, 49, 70, 18, 54, 78, 17, 44, 76, 74, 19, 23, 66, 21, 0, 21, 90, 81, 38, 42, 77, 42, 25, 70, 0, 40, 47, 19, 37, 65, 28, 82, 27, 76, 37, 44, 51, 21, 74, 40, 25, 79, 31, 36, 55, 54, 49, 23, 62, 73, 13, 53, 63, 45, 5, 42, 0, 60, 63, 34, 61, 28, 28, 75,0]
+      
+      //test5
+      // var mmarr= [0,4, 8, 4, 8, 4, 5, 4, 8, 1, 0, 2, 9, 3, 0, 4, 6, 4, 7, 4, 1, 8, 2, 2, 8, 3, 8, 3, 5, 7, 4, 7, 4, 8, 4, 11, 8, 1, 2, 9, 9, 4, 3, 8, 7, 2, 2, 7, 4, 9, 2, 1, 2, 4, 10, 3, 3, 8, 3, 8, 1, 4, 1, 9, 3, 6, 2, 2, 3, 3, 6, 9, 4, 9, 2, 5, 7, 4, 6, 3, 4, 7, 3, 2, 11, 3, 3, 1, 4, 10, 2, 7, 5, 9, 3, 8, 2, 5, 8,0]
+
+      //test6
+    // var mmarr=[1, 5, 2, 3, 1, 2, 0, 2, 1, 0, 5, 0, 5, 2, 0, 5, 1, 2, 0, 4, 0, 2, 0, 2, 5, 1, 1, 4, 1, 2, 0, 2, 2, 2, 1, 2, 3, 1, 0, 3, 2, 1, 4, 1, 2, 1, 1, 5, 2, 3, 1, 1, 0, 2, 4, 2, 2, 5, 1, 0, 4, 2, 1, 1, 2, 3, 4, 2, 1, 3, 2, 3, 6, 0, 1, 3, 5, 0, 2, 1, 3, 1, 4, 2, 3, 2, 1, 1, 1, 4, 2, 1, 1, 3, 0, 4, 1, 2, 2, 0]
+
+    // var mmarr=[39, 40, 18, 17, 20, 33, 38, 38, 39, 36, 35, 28, 38, 39, 22, 30, 41, 41, 34, 38, 40, 18, 17, 24, 25, 36, 35, 40, 31, 30, 35, 35, 33, 23, 16, 36, 35, 31, 33, 32, 35, 37, 40, 40, 35, 34, 36, 33, 33, 29, 38, 23, 35, 37, 29, 15, 35, 35, 16, 35, 33, 41, 38, 41, 29, 38, 39, 25, 18, 33, 40, 41, 24, 29, 17, 28, 28, 34, 38, 40, 24, 40, 40, 24, 22, 29, 29, 21, 30, 33, 35, 36, 40, 40, 43, 35, 42, 20, 27] //no in range test4
+    
+    
+    var mmarr=[]
+    console.log(mmarr1.length)
+    console.log(mmarr2.length)
+    console.log(mmarr3.length)
+    console.log(mmarr4.length)
+    console.log(mmarr5.length)
+   
+    //****bucket of 5
+    function calc_speed(arr){
+      var speed = [];
+      for(i = 0; i < arr.length;i++){
+        speed.push(arr[i]);
+      }
+      var size = speed.length;
+      for(i = 0; i < size; i=i+5){
+        nums = [speed[i],speed[i+1],speed[i+2],speed[i+3],speed[i+4]]
+        nums = nums.sort(function(a, b) {return a - b;});
+        //console.log(nums)
+        median = nums[2];
+        //console.log(median)
+        var visited = false;
+        var bool = false
+        if(nums[3]==median) bool = true;
+        for(j = i; j<i+5;j++){
+          if(speed[j]==median)
+            { if(!visited){ 
+                speed[j] = 1;
+                visited =true;}
+              else if(bool) speed[j] = 0.2;
+              else speed[j] = 1.8;
+            }
+          else if(speed[j]>median)
+            speed[j] = 0.2;
+          else speed[j] = 1.8;
+        }
+      }
+    return speed;
+  }
+    var speed1 = calc_speed(mmarr1)
+    var speed2 = calc_speed(mmarr2)
+    var speed3 = calc_speed(mmarr3)
+    var speed4 = calc_speed(mmarr4)
+    var speed5 = calc_speed(mmarr5)
+    //console.log(speed5)
+   
+
+      sum = 0;
+      for (i=0;i<speed1.length;i++)
+      { sum = sum+ speed1[i]; }
+      console.log("sum is"+sum)
+
+     //*********config custom ease function and plotly
+    x_cord1 = [0], y_cord1 =[0];
+    x_cord2 = [0], y_cord2 =[0];
+    x_cord3 = [0], y_cord3 =[0];
+    x_cord4 = [0], y_cord4 =[0];
+    x_cord5 = [0], y_cord5 =[0];
+
+    function calc_points(arr,index){
+      var points = [];
+      points[0]={x:0,y:1};
+      interval = 1/arr.length;
+
+      for(var i = 0; i < arr.length;i++){
+        res = 1- points[i].y + interval*arr[i];
+        //console.log(res)
+        
+        y_cord = window["y_cord"+index]
+        y_cord.push(res);
+        res = 1-res;
+        //res = res.toPrecision(2);
+        //console.log(res)
+        points[i+1]={x:interval*(i+1),y:res};
+        x_cord = window["x_cord"+index]
+        x_cord.push(interval*(i+1));
+      }
+
+      points[arr.length] = {x:1,y:0}
+      return points
+    }
+    var points1 = calc_points(speed1,"1");
+    var points2= calc_points(speed2,"2");
+    var points3 = calc_points(speed3,"3");
+    var points4 = calc_points(speed4,"4");
+    var points5 = calc_points(speed5,"5");
+    console.log(x_cord1)
+    console.log(x_cord5)
+    //console.log(y_cord)
+
+    var trace1 = {
+    x: x_cord1,
+    y: y_cord1,
+    mode: 'lines',
+    name: 'every frame'
+    };
+    var trace2 = {
+    x: x_cord2,
+    y: y_cord2,
+    mode: 'lines',
+    name: 'every 2 frames'
+    };
+    var trace3 = {
+    x: x_cord3,
+    y: y_cord3,
+    mode: 'lines',
+    name: 'every 3 frames'
+    };
+    var trace4 = {
+    x: x_cord4,
+    y: y_cord4,
+    mode: 'lines',
+    name: 'every 4 frames'
+    };
+    var trace5 = {
+    x: x_cord5,
+    y: y_cord5,
+    mode: 'lines',
+    name: 'every 5 frames'
+    };
+    var trace_linear = {
+      x: [0, 1],
+      y: [0, 1],
+    mode: 'lines',
+    name: 'linear',
+    line: {
+      dash: 'dot',
+      width: 2
+    }};
+    var trace0 = {
+      x: [0, 1],
+      y: [0, 1],
+    mode: 'lines',
+    name: 'linear'};
+
+    data0 =[trace0,trace_linear]
+    data1 = [trace1,trace_linear];
+    data2 = [trace2,trace_linear];
+    data3 = [trace3,trace_linear];
+    data4 = [trace4,trace_linear];
+    data5 = [trace5,trace_linear];
+
+    Plotly.newPlot('plotly', data1);
+    //console.log(points)
+    
+    var ey0 = 50;
+    var ey1 = 350;
+    var ex0 = 50;
+    var ex1 = 300;
+    // var easeYscale = d3.scale.linear()
+    // .range([ey1, ey0])
+    // var easeXscale = d3.scale.linear()
+    // .range([0, ex1])
+    var moEaseXScale = d3.scale.linear()
+    .range([0, 100])
+    var moEaseYScale = d3.scale.linear()
+    //.domain([ey1, ey0])
+    .range([0, 100])
+    
+    // var line = d3.svg.line()
+    //   .x(function(d) { return easeXscale(d.x) })
+    //   .y(function(d) { return ey1 - easeYscale(d.y) })
+    //   .interpolate("linear")
+    var lineEase = d3.svg.line()
+      .x(function(d) { return moEaseXScale(d.x) })
+      .y(function(d) { return moEaseYScale(d.y) })
+    // note: changed interpolation from "linear" to "basis" here
+      .interpolate("basis")
+    //var points = [{x:0,y:1},{x:0.2,y:0.6},{x:0.4,y:0.55},{x:0.6,y:0.55},{x:0.8,y:0.55},{x:1,y:0}]   
+    points0 = [{x:0,y:1},{x:1,y:0}];
+    ease0 = mojs.easing.path(lineEase(points0));
+     ease1 = mojs.easing.path(lineEase(points1));
+     ease2 = mojs.easing.path(lineEase(points2));
+    ease3 = mojs.easing.path(lineEase(points3));
+    ease4 = mojs.easing.path(lineEase(points4));
+    ease5 = mojs.easing.path(lineEase(points5));
+    
+  	// Start a transition that interpolates the data based on year.
+  	svg.transition()
+      	.duration(15000)
+        .ease(ease1)
+        //.ease("linear")
+      	.tween("year", tweenYear);
+  
+  	// Positions the dots based on data.
+  	function position(dot) {
+      	dot.attr("cx", function(d) { return xScale(x(d)); })
+          	.attr("cy", function(d) { return yScale(y(d)); })
+          	.attr("r", function(d) { return radiusScale(radius(d)); });
+    		}
+  
+  	// Defines a sort order so that the smallest dots are drawn on top.
+  	function order(a, b) { return radius(b) - radius(a); }
+  
+  	// After the transition finishes, you can mouseover to change the year.
+  	function enableInteraction() {
+      	var yearScale = d3.scale.linear()
+        	.domain([1800, 2009])
+        	.range([box.x + 10, box.x + box.width - 10])
+        	.clamp(true);
+
+      	// Cancel the current transition, if any.
+      	svg.transition().duration(0);
+
+      	overlay
+          	.on("mouseover", mouseover)
+          	.on("mouseout", mouseout)
+          	.on("mousemove", mousemove)
+          	.on("touchmove", mousemove);
+
+      	function mouseover() { label.classed("active", true); }
+      	function mouseout() { label.classed("active", false); }
+      	function mousemove() { displayYear(yearScale.invert(d3.mouse(this)[0])); }
+  	}
+    
+  	// Tweens the entire chart by first tweening the year, and then the data.
+  	// For the interpolated data, the dots and label are redrawn.
+  	function tweenYear() {
+      	var year = d3.interpolateNumber(1800, 2009);
+      	return function(t) { displayYear(year(t) );
+           //saveSvgAsPng(document.getElementById("vis"), year(t)+"diagram.png");
+          //console.log(year(t));
+         }
+    }
+
+  	// Updates the display to show the specified year.
+  	function displayYear(year) {
+      	//console.log(dot.data(interpolateData(year), key).call(position).sort(order))
+        dot.data(interpolateData(year), key).call(position).sort(order);
+      	label.text(Math.round(year));
+    }
+
+  	// Interpolates the dataset for the given (fractional) year.
+  	function interpolateData(year) {
+      	return nations.map(function(d) {
+          	return {
+              	name: d.name,
+              	region: d.region,
+              	income: interpolateValues(d.income, year),
+              	population: interpolateValues(d.population, year),
+              	lifeExpectancy: interpolateValues(d.lifeExpectancy, year)
+            };
+        });
+    }
+
+  	// Finds (and possibly interpolates) the value for the specified year.
+  	function interpolateValues(values, year) {
+      	var i = bisect.left(values, year, 0, values.length - 1),
+            a = values[i];
+      	if (i > 0) {
+          	var b = values[i - 1],
+                t = (year - a[0]) / (b[0] - a[0]);
+          	return a[1] * (1 - t) + b[1] * t;
+        }
+      return a[1];
+    }
+    d3.select("#rerun").on("click", function(){
+      var frame = document.getElementById("custom_frame").value
+      ease = window["ease"+frame]
+      console.log(frame)
+      svg.transition()
+        .duration(15000)
+        .ease(ease)
+        //.ease("linear")
+        .tween("year", tweenYear);
+        Plotly.newPlot('plotly', window["data"+frame]);
+    } )
+});
+</script>
