@@ -22,7 +22,7 @@ Make sure it works.
 Step 2: Download all files. Open web/index.html, uncomment line 470:
 	saveSvgAsPng(document.getElementById("vis"), year(t)+"diagram.png");
 and uncomment line 431: .ease("linear") , then comment line 430, save;
-//give purpose
+*give purpose*
 
 Step 3: In terminal, go to "web/" folder, type in 
 	python -m SimpleHTTPServer 1337
@@ -38,7 +38,7 @@ now you will get an array of numbers. they are motion magnitude of the change be
 I already have all the motion magnitude arrays in index.html from line 221.
 
 Step 5: Now comment line 470 and 431, uncomment line 430, save; refresh your page on browser now it will run in the custom speed.
-//give purpose
+*give purpose*
 
 Step 6: On the page, in the input box, type in a number and hit submit to see different speed according to the lookback parameter. For example, "5" means custom speed was built upon differences between every 5 frames. 
 
@@ -51,6 +51,9 @@ Scroll down to see the speed. Blue line is custom, orange is constant speed. Whe
 ## Evaluation Design
 
 See powerpoint from above
+
+## Future Work
+Bring everything online...
 
 
 
