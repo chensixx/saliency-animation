@@ -34,7 +34,7 @@ Step 4: In terminal, go to your saliency folder run
 In about 20 minutes, all the saliency maps will be in folder "predictions/"
 Then run 
 	python img.py 
-now you will get an array of numbers. they are motion magnitude of the change between every frame. If you want difference between every n frames just change line 20 into range(n,size,n) and line 21 into [x-5] line 22 to [x]
+now you will get an array of numbers. they are motion magnitude of the change between every frame. If you want difference between every n frames just change line 20 into range(n,size,n) and line 21 into [x-5] line 22 to [x].
 I already have all the motion magnitude arrays in index.html from line 221.
 
 Step 5: Now comment line 470 and 431, uncomment line 430, save; refresh your page on browser now it will run in the custom speed.
@@ -50,6 +50,7 @@ Scroll down to see the speed. Blue line is custom, orange is constant speed. Whe
 
 ## Evaluation Design
 
+See powerpoint from above
 
 
 
