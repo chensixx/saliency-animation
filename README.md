@@ -46,7 +46,7 @@ Scroll down to see the speed. Blue line is custom, orange is constant speed. Whe
 
 
 ## Sample pictures
-
+![table](TABLE.png)
 
 ## Evaluation Design
 
